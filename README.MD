@@ -42,6 +42,8 @@ The project follows a standard layered architecture to ensure maintainability an
 │   │   └── user.go           # User data structure
 │   ├── repository/
 │   │   └── user_repository.go# Data access layer (Firestore)
+│   ├── role/
+│   │   └── role.go           # Role constants and logic
 │   └── service/
 │       └── user_service.go   # Business logic layer
 ├── .env                        # Local environment variables (gitignored)
