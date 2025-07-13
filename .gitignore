@@ -1,0 +1,43 @@
+# Secrets and Environment Variables
+# =================================
+# Firebase service account key
+serviceAccountKey.json
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Go Dependencies & Binaries
+# ==========================
+# Compiled executable.
+# Replace 'go-firebase-api' with the name of your executable if different.
+go-firebase-api
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Go module cache
+vendor/
+
+# IDE / Editor Directories
+# ========================
+.vscode/
+.idea/
+
+# OS-specific files
+# =================
+.DS_Store
+*.swp
+
+# Log and Coverage files
+# ======================
+*.log
+*.out
