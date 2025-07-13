@@ -66,8 +66,8 @@ Follow these steps to get the project running on your local machine.
 
 1.  **Clone the repository:**
     ```bash
-    git clone <your-repository-url>
-    cd <your-repository-name>
+    git clone https://github.com/hermantrym/go-firebase-api.git
+    cd go-firebase-api
     ```
 
 2.  **Set up Firebase Credentials:**
