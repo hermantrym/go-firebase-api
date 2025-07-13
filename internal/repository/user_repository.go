@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"github.com/hermantrym/go-firebase-api/internal/apierror"
+	"google.golang.org/api/iterator"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"log"
@@ -16,6 +18,7 @@ type UserRepository interface {
 	CreateUser(ctx context.Context, user model.User) (*model.User, error)
 	GetUser(ctx context.Context, id string) (*model.User, error)
 	GetUserByEmail(ctx context.Context, email string) (*model.User, error)
+	GetAllUsers(ctx context.Context) ([]model.User, error)
 }
 
 // userRepository is the concrete implementation of UserRepository that interacts with Firestore.
@@ -34,6 +37,7 @@ func (r *userRepository) CreateUser(ctx context.Context, user model.User) (*mode
 	docRef, _, err := r.client.Collection("users").Add(ctx, map[string]interface{}{
 		"name":  user.Name,
 		"email": user.Email,
+		"role":  user.Role,
 	})
 
 	if err != nil {
@@ -69,6 +73,38 @@ func (r *userRepository) GetUser(ctx context.Context, id string) (*model.User, e
 
 	user.ID = docSnap.Ref.ID
 	return &user, nil
+}
+
+// GetAllUsers retrieves all user documents from the "users" collection.
+func (r *userRepository) GetAllUsers(ctx context.Context) ([]model.User, error) {
+	var users []model.User
+	iter := r.client.Collection("users").Documents(ctx)
+	defer iter.Stop()
+
+	for {
+		doc, err := iter.Next()
+		// iterator.Done signifies that all documents have been processed.
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			log.Printf("Error iterating users: %v", err)
+			return nil, apierror.NewInternalServerError("Failed to retrieve users")
+		}
+
+		var user model.User
+		if err := doc.DataTo(&user); err != nil {
+			log.Printf("Error converting user data for doc ID %s: %v", doc.Ref.ID, err)
+			// Continue to the next document if one fails to convert, or return an error.
+			// For this implementation, we will return an error to ensure data integrity.
+			return nil, apierror.NewInternalServerError("Failed to process user data")
+		}
+
+		user.ID = doc.Ref.ID
+		users = append(users, user)
+	}
+
+	return users, nil
 }
 
 // GetUserByEmail retrieves a single user document by their email address.

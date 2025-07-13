@@ -27,8 +27,12 @@ func main() {
 	// Initialize Services & Dependencies
 	// Initialize the Firestore client connection.
 	firestoreClient := config.InitializeFirebase()
-	// Ensure the client is closed when the application exits.
-	defer firestoreClient.Close()
+	// Ensure the client is closed gracefully when the application exits.
+	defer func() {
+		if err := firestoreClient.Close(); err != nil {
+			log.Printf("ERROR: Failed to close Firestore client: %v", err)
+		}
+	}()
 	// Create a new instance of the validator.
 	validate := validator.New()
 
@@ -54,6 +58,18 @@ func main() {
 	{
 		// The endpoint to get user details is now protected.
 		authorized.GET("/users/:id", userHandler.GetUser)
+	}
+
+	// --- PROTECTED ADMIN ROUTES ---
+	// This group of routes is protected by two layers of middleware:
+	// AuthMiddleware() - Ensures the user has a valid JWT.
+	// RoleAuthMiddleware("admin") - Ensures the user has the 'admin' role.
+	adminRoutes := r.Group("/admin")
+	adminRoutes.Use(auth.AuthMiddleware())
+	adminRoutes.Use(auth.RoleAuthMiddleware("admin"))
+	{
+		adminRoutes.GET("/users", userHandler.GetAllUsers)
+		adminRoutes.POST("/users", userHandler.AdminCreateUser)
 	}
 
 	// Run Server

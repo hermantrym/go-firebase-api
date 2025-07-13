@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"github.com/hermantrym/go-firebase-api/internal/role"
 	"net/http"
 	"os"
 	"strings"
@@ -12,16 +13,18 @@ import (
 	"github.com/hermantrym/go-firebase-api/internal/apierror"
 )
 
-// JWTClaims defines the custom claims to be stored in the JWT payload.
+// JWTClaims defines the custom claims to be stored in the JWT payload,
+// including user identification and authorization role.
 type JWTClaims struct {
-	UserID string `json:"user_id"`
-	Email  string `json:"email"`
+	UserID string    `json:"user_id"`
+	Email  string    `json:"email"`
+	Role   role.Role `json:"role"`
 	jwt.RegisteredClaims
 }
 
-// GenerateJWT creates a new signed JWT for a given user.
-// It relies on the JWT_SECRET_KEY environment variable.
-func GenerateJWT(userID, email string) (string, error) {
+// GenerateJWT creates a new signed JWT for a given user, including their role.
+// It relies on the JWT_SECRET_KEY environment variable for signing.
+func GenerateJWT(userID, email string, userRole role.Role) (string, error) {
 	// Retrieve the secret key from environment variables.
 	secretKey := os.Getenv("JWT_SECRET_KEY")
 	if secretKey == "" {
@@ -35,6 +38,7 @@ func GenerateJWT(userID, email string) (string, error) {
 	claims := &JWTClaims{
 		UserID: userID,
 		Email:  email,
+		Role:   userRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -91,8 +95,41 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// Store the user ID in the context for use by subsequent handlers.
 		c.Set("userID", claims.UserID)
+		c.Set("userRole", claims.Role)
 
 		// Continue to the next handler.
+		c.Next()
+	}
+}
+
+// RoleAuthMiddleware creates a gin middleware to authorize access based on a required role.
+// This middleware should be used *after* the AuthMiddleware.
+func RoleAuthMiddleware(requiredRole string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Retrieve the user's role from the context (set by AuthMiddleware).
+		userRole, exists := c.Get("userRole")
+		if !exists {
+			err := apierror.NewAPIError(http.StatusForbidden, "User role not found in token")
+			c.AbortWithStatusJSON(err.Code, err)
+			return
+		}
+
+		// Type assert the role from the context.
+		roleFromContext, ok := userRole.(role.Role)
+		if !ok {
+			err := apierror.NewAPIError(http.StatusInternalServerError, "User role in context has an invalid type")
+			c.AbortWithStatusJSON(err.Code, err)
+			return
+		}
+
+		// Check if the user's role matches the required role.
+		if string(roleFromContext) != requiredRole {
+			err := apierror.NewAPIError(http.StatusForbidden, "You do not have permission to access this resource")
+			c.AbortWithStatusJSON(err.Code, err)
+			return
+		}
+
+		// If authorization is successful, proceed to the next handler.
 		c.Next()
 	}
 }

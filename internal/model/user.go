@@ -1,5 +1,7 @@
 package model
 
+import "github.com/hermantrym/go-firebase-api/internal/role"
+
 // User represents the data model for a user in the application.
 // It includes struct tags for JSON serialization, Firestore mapping, and validation.
 type User struct {
@@ -15,4 +17,7 @@ type User struct {
 	// Email is the user's email address.
 	// It is a required field and must be a valid email format.
 	Email string `json:"email" firestore:"email" validate:"required,email"`
+
+	// Role defines the user's authorization level (e.g., "admin", "user").
+	Role role.Role `json:"role" firestore:"role"`
 }

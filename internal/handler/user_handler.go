@@ -61,6 +61,38 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, createdUser)
 }
 
+// AdminCreateUser handles the POST /admin/users endpoint.
+// This allows an administrator to create a new user, potentially with a specific role.
+// It validates the incoming user data before creation.
+func (h *UserHandler) AdminCreateUser(c *gin.Context) {
+	var user model.User
+	if err := c.ShouldBindJSON(&user); err != nil {
+		apiErr := apierror.NewBadRequestError("Invalid JSON format")
+		c.JSON(apiErr.Code, apiErr)
+		return
+	}
+
+	// Validate the user struct based on the defined tags.
+	if err := h.validate.Struct(user); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"errors": formatValidationErrors(err)})
+		return
+	}
+
+	// Call the service to register the user.
+	createdUser, err := h.userService.AdminRegisterUser(c.Request.Context(), user)
+	if err != nil {
+		var apiErr *apierror.APIError
+		if errors.As(err, &apiErr) {
+			c.JSON(apiErr.Code, apiErr)
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusCreated, createdUser)
+}
+
 // GetUser handles the GET /users/:id endpoint.
 // It retrieves a user by the ID provided in the URL path.
 func (h *UserHandler) GetUser(c *gin.Context) {
@@ -82,6 +114,23 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+// GetAllUsers handles the GET /admin/users endpoint.
+// It retrieves a list of all users in the system.
+func (h *UserHandler) GetAllUsers(c *gin.Context) {
+	users, err := h.userService.FindAllUsers(c.Request.Context())
+	if err != nil {
+		var apiErr *apierror.APIError
+		if errors.As(err, &apiErr) {
+			c.JSON(apiErr.Code, apiErr)
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "An unexpected error occurred"})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, users)
 }
 
 // formatValidationErrors transforms validation errors from the validator library
