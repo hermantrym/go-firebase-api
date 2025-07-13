@@ -3,7 +3,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.18+-blue.svg)](https://golang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A robust and modular RESTful API built with Golang, using Firebase (Firestore) for data persistence. This project demonstrates professional backend development practices including a clean, layered architecture, JWT authentication, input validation, and structured error handling.
+A robust and modular RESTful API built with Golang, using Firebase (Firestore) for data persistence. This project demonstrates professional backend development practices including a clean, layered architecture, JWT authentication, role-based authorization, input validation, and structured error handling.
 
 ---
 
@@ -11,11 +11,11 @@ A robust and modular RESTful API built with Golang, using Firebase (Firestore) f
 
 -   **Modular Architecture**: Clean separation of concerns using a layered structure (Handler, Service, Repository).
 -   **JWT Authentication**: Secure endpoints using a JWT-based authentication middleware.
+-   **Role-Based Authorization (RBAC)**: Securely restricts access based on user roles. Features separate endpoints for public registration and admin-level user management.
 -   **Configuration Management**: Securely manages configuration and secrets using environment variables (`.env` file).
 -   **Input Validation**: Strong server-side validation of request data using `go-playground/validator`.
--   **Structured Error Handling**: A custom error handling system to provide clear, consistent error responses for different scenarios (e.g., Not Found, Bad Request, Internal Server Error).
+-   **Structured Error Handling**: A custom error handling system to provide clear, consistent error responses for different scenarios.
 -   **Firebase Integration**: Uses the Firebase Admin SDK for Go to interact with Cloud Firestore.
--   **RESTful Endpoints**: Provides clear and consistent API endpoints for user management and authentication.
 
 ---
 
@@ -56,7 +56,7 @@ The project follows a standard layered architecture to ensure maintainability an
 ## Prerequisites
 
 -   [Go](https://golang.org/dl/) version 1.18 or higher.
--   A [Google Firebase](https://console.firebase.google.com/) project.
+-   A [Google Firebase](https://console.firebase.google.com/) project with Firestore enabled.
 
 ---
 
@@ -76,10 +76,7 @@ Follow these steps to get the project running on your local machine.
     -   Rename the downloaded file to `serviceAccountKey.json` and place it in the root directory of the project.
 
 3.  **Configure Environment Variables:**
-    -   Create a new file named `.env` in the root directory by copying the example:
-        ```bash
-        cp .env.example .env
-        ```
+    -   Create a new file named `.env` in the root directory. You can copy the `.env.example` file if it exists.
     -   Open the `.env` file and set the required variables. See the [Environment Variables](#environment-variables) section below for details.
 
 4.  **Install Dependencies:**
@@ -113,13 +110,6 @@ Follow these steps to get the project running on your local machine.
 }
 ```
 
-**Example Request:**
-```bash
-curl -X POST -H "Content-Type: application/json" \
--d '{"email": "budi.santoso@example.com"}' \
-http://localhost:8080/login
-```
-
 **Success Response (200 OK):**
 ```json
 {
@@ -133,30 +123,24 @@ http://localhost:8080/login
 
 -   **Method**: `POST`
 -   **Path**: `/users`
--   **Description**: Creates a new user in the database.
+-   **Description**: Creates a new user with a default "user" role. Any `role` field provided in the request body will be ignored for security reasons.
 -   **Access**: Public
 
 **Request Body:**
 ```json
 {
-    "name": "Budi Santoso",
-    "email": "budi.santoso@example.com"
+  "name": "Budi Santoso",
+  "email": "budi.santoso@example.com"
 }
-```
-
-**Example Request:**
-```bash
-curl -X POST -H "Content-Type: application/json" \
--d '{"name": "Budi Santoso", "email": "budi.santoso@example.com"}' \
-http://localhost:8080/users
 ```
 
 **Success Response (201 Created):**
 ```json
 {
-    "id": "VKeJZXbUp7ba1xIGBWdp",
-    "name": "Budi Santoso",
-    "email": "budi.santoso@example.com"
+  "id": "some-generated-id",
+  "name": "Budi Santoso",
+  "email": "budi.santoso@example.com",
+  "role": "user"
 }
 ```
 
@@ -165,36 +149,97 @@ http://localhost:8080/users
 -   **Method**: `GET`
 -   **Path**: `/users/:id`
 -   **Description**: Retrieves the details of a specific user.
--   **Access**: **Protected** (Requires a valid JWT)
+-   **Access**: **Protected** (Requires a valid JWT for any authenticated user)
 
-**Example Flow:**
+**Example Request:**
+```bash
+TOKEN="<your-jwt>"
+USER_ID="<user-id-to-fetch>"
 
-1.  **Attempt access without a token (will fail):**
-    ```bash
-    # This will return a 401 Unauthorized error
-    curl -v http://localhost:8080/users/some-user-id
-    ```
-
-2.  **Get a token via the `/login` endpoint.**
-
-3.  **Access the protected route with the token:**
-    ```bash
-    # Set environment variables for convenience
-    TOKEN="<your-copied-jwt-from-login>"
-    USER_ID="<the-id-of-the-user-you-want-to-fetch>"
-
-    # Make the authenticated request
-    curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/users/$USER_ID
-    ```
+curl -H "Authorization: Bearer $TOKEN" http://localhost:8080/users/$USER_ID
+```
 
 **Success Response (200 OK):**
 ```json
 {
-    "id": "VKeJZXbUp7ba1xIGBWdp",
+    "id": "some-user-id",
     "name": "Budi Santoso",
-    "email": "budi.santoso@example.com"
+    "email": "budi.santoso@example.com",
+    "role": "user"
 }
 ```
+
+### Admin Endpoints
+
+#### 1. Get All Users
+
+-   **Method**: `GET`
+-   **Path**: `/admin/users`
+-   **Description**: Retrieves a list of all users in the system.
+-   **Access**: **Protected (Admin Only)**
+
+**Example Request:**
+```bash
+# Ensure this token belongs to a user with the 'admin' role
+ADMIN_TOKEN="<your-admin-jwt>"
+
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://localhost:8080/admin/users
+```
+
+**Success Response (200 OK):**
+```json
+[
+    {
+        "id": "user-id-1",
+        "name": "Admin User",
+        "email": "admin@example.com",
+        "role": "admin"
+    },
+    {
+        "id": "user-id-2",
+        "name": "Budi Santoso",
+        "email": "budi.santoso@example.com",
+        "role": "user"
+    }
+]
+```
+
+#### 2. Create a New User (Admin)
+
+-   **Method**: `POST`
+-   **Path**: `/admin/users`
+-   **Description**: Allows an admin to create a new user with a specific role. If the `role` is omitted, it defaults to "user".
+-   **Access**: **Protected (Admin Only)**
+
+**Request Body:**
+```json
+{
+    "name": "Admin Baru",
+    "email": "admin.baru@example.com",
+    "role": "admin"
+}
+```
+
+**Example Request:**
+```bash
+ADMIN_TOKEN="<your-admin-jwt>"
+
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
+-H "Content-Type: application/json" \
+-d '{"name": "Admin Baru", "email": "admin.baru@example.com", "role": "admin"}' \
+http://localhost:8080/admin/users
+```
+
+**Success Response (200 OK):**
+```json
+{
+    "id": "another-generated-id",
+    "name": "Admin Baru",
+    "email": "admin.baru@example.com",
+    "role": "admin"
+}
+```
+
 ---
 
 ## Environment Variables
@@ -220,9 +265,9 @@ These variables must be defined in a `.env` file in the project root.
 
 ## Future Improvements
 
+-   [x] **Role-Based Access Control (RBAC)**: Restricts access to specific endpoints based on user roles.
 -   [ ] **Password Hashing**: Implement `bcrypt` for secure password storage and authentication.
 -   [ ] **Unit & Integration Tests**: Write comprehensive tests for all layers of the application.
--   [ ] **Role-Based Access Control (RBAC)**: Add roles to users (e.g., `admin`, `user`) and create middleware to restrict access based on roles.
 -   [ ] **Structured Logging**: Integrate a logging library like `Logrus` or `Zap` for better log management.
 -   [ ] **Dockerize the Application**: Create a `Dockerfile` to containerize the application for easier deployment.
 
